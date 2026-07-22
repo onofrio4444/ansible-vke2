@@ -31,5 +31,8 @@
 # --- 7. PostgreSQL con dati sintetici di test ---
 - import_playbook: playbooks/08-postgres.yml
 
-# --- 8. Webapp Python di verifica dati ---
+# --- 8. Risorse di test per il backup (Secret, Deployment, HelmChart) ---
+- import_playbook: playbooks/11-risorse-test.yml
+
+# --- 9. Webapp Python di verifica dati ---
 - import_playbook: playbooks/09-webapp.yml

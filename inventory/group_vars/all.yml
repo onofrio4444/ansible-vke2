@@ -62,3 +62,11 @@ postgres_storage: "5Gi"
 # Quanti dati sintetici generare nel database testdb.
 postgres_seed_clienti: 10000
 postgres_seed_ordini: 50000
+
+# ---------- Risorse di test per il backup (namespace postgres) ----------
+# App di esempio installata via Helm (podinfo). Un secondo cert-manager
+# non si puo' usare come test: esiste gia' a livello di cluster.
+test_helm_repo: "https://stefanprodan.github.io/podinfo"
+test_helm_chart: "podinfo"
+# Versione del chart da fissare (vuoto = ultima della repo).
+test_helm_version: ""

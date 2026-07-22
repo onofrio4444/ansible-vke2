@@ -1,0 +1,57 @@
+---
+# ============================================================
+# 11 - RISORSE DI TEST PER IL BACKUP COMMVAULT
+# Aggiunge al namespace postgres un Secret, un Deployment e
+# un'app Helm di esempio (podinfo), cosi' il backup del
+# namespace copre anche questi tipi di risorsa.
+#
+# USO: ansible-playbook -i inventory/test.ini playbooks/11-risorse-test.yml
+# ============================================================
+
+- name: Risorse di test per il backup
+  hosts: server
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  tasks:
+
+    - name: Copia il manifest delle risorse di test sul nodo
+      ansible.builtin.template:
+        src: ../templates/test-risorse.yaml.j2
+        dest: /tmp/test-risorse.yaml
+        mode: "0644"
+
+    - name: Applica Secret, Deployment e HelmChart di test
+      ansible.builtin.command: "{{ kubectl_bin }} apply -f /tmp/test-risorse.yaml"
+      register: test_apply
+      changed_when: "'created' in test_apply.stdout or 'configured' in test_apply.stdout"
+
+    - name: Attendi che il Deployment test-nginx sia pronto
+      ansible.builtin.command: >
+        {{ kubectl_bin }} -n postgres rollout status deploy/test-nginx --timeout=60s
+      register: nginx_ready
+      changed_when: false
+      retries: 5
+      delay: 10
+      until: nginx_ready.rc == 0
+
+    - name: Attendi che l'app Helm di test (podinfo) sia pronta
+      ansible.builtin.command: >
+        {{ kubectl_bin }} -n postgres rollout status deploy/test-podinfo --timeout=60s
+      register: podinfo_ready
+      changed_when: false
+      retries: 10
+      delay: 15
+      until: podinfo_ready.rc == 0
+
+    - name: Riepilogo risorse di test
+      ansible.builtin.command: >
+        {{ kubectl_bin }} -n postgres get secret,deploy,helmchart
+      register: test_list
+      changed_when: false
+
+    - name: Mostra il riepilogo
+      ansible.builtin.debug:
+        msg: |
+          Risorse di test pronte nel namespace postgres:
+          {{ test_list.stdout }}

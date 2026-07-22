@@ -42,7 +42,10 @@ per i LoadBalancer, e **Rancher** (+ cert-manager).
    da inserire in Commvault; endpoint API: https://<IP-del-nodo>:6443)
 7. PostgreSQL di test (StatefulSet su StorageClass tanzu-sp) con database
    "testdb" popolato di dati sintetici (clienti e ordini casuali)
-8. Webapp Python (Flask) che mostra una pagina HTML con lo stato del
+8. Risorse di test per il backup nel namespace postgres: Secret,
+   Deployment (nginx) e app Helm di esempio (podinfo), per verificare
+   che Commvault protegga anche questi tipi di risorsa
+9. Webapp Python (Flask) che mostra una pagina HTML con lo stato del
    collegamento a PostgreSQL e un estratto dei dati; esposta su un IP
    del pool MetalLB (l'URL viene stampato a fine run)
 
