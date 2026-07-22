@@ -1,0 +1,39 @@
+# ============================================================
+# Longhorn come HelmChart (lo installa l'helm-controller di RKE2)
+# Storage CSI con supporto snapshot: serve a Commvault per i
+# backup dei volumi. Configurato per cluster single-node
+# (1 replica per volume).
+# In piu': VolumeSnapshotClass che Commvault usera' per creare
+# gli snapshot CSI (il controller e le CRD snapshot sono gia'
+# inclusi in RKE2).
+# ============================================================
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: longhorn
+  namespace: kube-system
+spec:
+  chart: longhorn
+  repo: {{ longhorn_repo }}
+{% if longhorn_version | default('') | length > 0 %}
+  version: {{ longhorn_version }}
+{% endif %}
+  targetNamespace: longhorn-system
+  createNamespace: true
+  valuesContent: |-
+    defaultSettings:
+      defaultReplicaCount: 1
+    persistence:
+      defaultClass: false
+      defaultClassReplicaCount: 1
+---
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: longhorn-snapclass
+driver: driver.longhorn.io
+deletionPolicy: Delete
+parameters:
+  # "snap" = snapshot dentro il cluster (non richiede un backup target
+  # esterno; e' quello che serve a Commvault per leggere i dati)
+  type: snap

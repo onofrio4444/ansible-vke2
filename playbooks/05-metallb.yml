@@ -1,0 +1,45 @@
+---
+# ============================================================
+# 05 - METALLB (LoadBalancer su IP aggiuntivi)
+# Installa MetalLB e configura il pool di IP + annuncio L2.
+# Gira sul SERVER (usa il kubectl e la kubeconfig del control plane).
+# ============================================================
+
+- name: MetalLB
+  hosts: server
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  tasks:
+
+    - name: Installa MetalLB
+      ansible.builtin.command: >
+        {{ kubectl_bin }} apply -f
+        https://raw.githubusercontent.com/metallb/metallb/{{ metallb_version }}/config/manifests/metallb-native.yaml
+      register: metallb_apply
+      changed_when: "'created' in metallb_apply.stdout or 'configured' in metallb_apply.stdout"
+
+    - name: Attendi che il controller MetalLB sia pronto
+      ansible.builtin.command: >
+        {{ kubectl_bin }} -n metallb-system rollout status deploy/controller --timeout=180s
+      changed_when: false
+
+    - name: Attendi che il webhook MetalLB sia attivo
+      ansible.builtin.command: >
+        {{ kubectl_bin }} -n metallb-system wait --for=condition=Available deploy/controller --timeout=120s
+      changed_when: false
+
+    - name: Copia il template del pool IP sul nodo
+      ansible.builtin.template:
+        src: ../templates/metallb-pool.yaml.j2
+        dest: /tmp/metallb-pool.yaml
+        mode: "0644"
+
+    - name: Configura il pool di IP e l'annuncio L2
+      ansible.builtin.command: "{{ kubectl_bin }} apply -f /tmp/metallb-pool.yaml"
+      register: pool_apply
+      changed_when: "'created' in pool_apply.stdout or 'configured' in pool_apply.stdout"
+      # A volte il webhook non e' ancora pronto al primo colpo: riprova.
+      retries: 5
+      delay: 10
+      until: pool_apply.rc == 0

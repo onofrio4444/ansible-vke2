@@ -1,0 +1,64 @@
+---
+# ============================================================
+# VARIABILI DEL CLUSTER
+# Modifica solo questo file per adattare l'installazione.
+# ============================================================
+
+# ---------- RKE2 ----------
+# Versione da installare. Lascia "" per l'ultima stabile del canale.
+rke2_version: ""
+rke2_channel: "stable"
+# CNI richiesto.
+rke2_cni: "canal"
+# Token del cluster: CAMBIALO con una stringa segreta a piacere.
+rke2_token: "una-stringa-segreta-a-piacere"
+# Percorsi standard installati da RKE2 (di norma non serve toccarli).
+rke2_bin: "/usr/local/bin/rke2"
+kubectl_bin: "/var/lib/rancher/rke2/bin/kubectl"
+kubeconfig: "/etc/rancher/rke2/rke2.yaml"
+
+# ---------- StorageClass "tanzu-sp" (su Longhorn) ----------
+# Chiamata "tanzu-sp" cosi' i manifest applicativi che cercano
+# quel nome funzionano; dietro c'e' Longhorn (CSI con snapshot).
+storageclass_name: "tanzu-sp"
+# Se true, diventa la StorageClass di default del cluster.
+storageclass_default: true
+
+# ---------- MetalLB ----------
+metallb_version: "v0.15.2"
+# Range di IP LIBERI per i Service LoadBalancer.
+metallb_ip_range: "192.168.114.200-192.168.114.204"
+
+# ---------- Rancher (+ cert-manager) ----------
+# Abilita/disabilita l'installazione di Rancher.
+rancher_enabled: true
+# Nome host della UI di Rancher: DEVE essere un nome DNS (non un IP), perche'
+# l'Ingress di Kubernetes non accetta IP come host.
+# rancher.<IP>.sslip.io risolve da solo verso l'IP, senza toccare DNS o /etc/hosts.
+rancher_hostname: "rancher.192.168.114.117.sslip.io"
+# Password iniziale admin (min. 12 caratteri). Cambiala al primo login.
+rancher_bootstrap_password: "CambiaMiSubito123"
+# Repo chart Rancher: stable | latest | alpha
+rancher_chart_repo: "https://releases.rancher.com/server-charts/stable"
+# Versione Rancher da fissare (vuoto = ultima della repo scelta).
+rancher_version: ""
+# Repliche: 1 per cluster single-node (il default del chart e' 3).
+rancher_replicas: 1
+# cert-manager (prerequisito di Rancher). Verifica la support matrix di Rancher.
+cert_manager_repo: "https://charts.jetstack.io"
+cert_manager_version: "v1.20.2"
+
+# ---------- Longhorn (storage CSI con snapshot, per Commvault) ----------
+longhorn_repo: "https://charts.longhorn.io"
+# Versione del chart da fissare (vuoto = ultima della repo).
+longhorn_version: ""
+
+# ---------- PostgreSQL di test ----------
+postgres_image: "postgres:17"
+# Password dell'utente "postgres": CAMBIALA.
+postgres_password: "PostgresTest2026"
+# Dimensione del volume dati (StorageClass tanzu-sp).
+postgres_storage: "5Gi"
+# Quanti dati sintetici generare nel database testdb.
+postgres_seed_clienti: 10000
+postgres_seed_ordini: 50000

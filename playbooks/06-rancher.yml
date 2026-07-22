@@ -1,0 +1,77 @@
+---
+# ============================================================
+# 06 - RANCHER (+ cert-manager)
+# Installa cert-manager e poi Rancher usando l'helm-controller
+# gia' presente in RKE2 (risorse HelmChart applicate con kubectl).
+# Ordine: cert-manager -> attesa -> Rancher -> attesa.
+# Gira sul SERVER (usa il kubectl e la kubeconfig del control plane).
+# Si puo' saltare mettendo rancher_enabled: false.
+# ============================================================
+
+- name: Installazione Rancher e cert-manager
+  hosts: server
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  tasks:
+
+    # --- cert-manager ---------------------------------------
+
+    - name: Copia il template HelmChart di cert-manager sul nodo
+      ansible.builtin.template:
+        src: ../templates/cert-manager.yaml.j2
+        dest: /tmp/cert-manager.yaml
+        mode: "0644"
+      when: rancher_enabled | default(true)
+
+    - name: Applica cert-manager (HelmChart)
+      ansible.builtin.command: "{{ kubectl_bin }} apply -f /tmp/cert-manager.yaml"
+      register: cm_apply
+      changed_when: "'created' in cm_apply.stdout or 'configured' in cm_apply.stdout"
+      when: rancher_enabled | default(true)
+
+    - name: Attendi che cert-manager sia installato e pronto
+      # Il webhook di cert-manager esiste solo dopo che l'helm-controller
+      # ha finito: il ciclo retry tollera i primi tentativi "not found".
+      ansible.builtin.command: >
+        {{ kubectl_bin }} -n cert-manager rollout status deploy/cert-manager-webhook --timeout=30s
+      register: cm_ready
+      changed_when: false
+      retries: 20
+      delay: 15
+      until: cm_ready.rc == 0
+      when: rancher_enabled | default(true)
+
+    # --- Rancher --------------------------------------------
+
+    - name: Copia il template HelmChart di Rancher sul nodo
+      ansible.builtin.template:
+        src: ../templates/rancher.yaml.j2
+        dest: /tmp/rancher.yaml
+        mode: "0644"
+      when: rancher_enabled | default(true)
+
+    - name: Applica Rancher (HelmChart)
+      ansible.builtin.command: "{{ kubectl_bin }} apply -f /tmp/rancher.yaml"
+      register: rancher_apply
+      changed_when: "'created' in rancher_apply.stdout or 'configured' in rancher_apply.stdout"
+      when: rancher_enabled | default(true)
+
+    - name: Attendi che Rancher sia pronto (puo' richiedere qualche minuto)
+      ansible.builtin.command: >
+        {{ kubectl_bin }} -n cattle-system rollout status deploy/rancher --timeout=60s
+      register: rancher_ready
+      changed_when: false
+      retries: 30
+      delay: 20
+      until: rancher_ready.rc == 0
+      when: rancher_enabled | default(true)
+
+    - name: Promemoria accesso
+      ansible.builtin.debug:
+        msg: >
+          Rancher installato. Apri https://{{ rancher_hostname }} (assicurati che il nome
+          risolva verso un IP del cluster / LoadBalancer). Password iniziale: quella in
+          rancher_bootstrap_password. Verifica con:
+          kubectl -n cattle-system get pods
+      when: rancher_enabled | default(true)

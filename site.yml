@@ -1,0 +1,35 @@
+---
+# ============================================================
+# PLAYBOOK PRINCIPALE
+# Crea il cluster nell'ordine giusto:
+#   Prerequisiti OS -> RKE2 -> Longhorn (+ StorageClass tanzu-sp)
+#   -> MetalLB -> Rancher -> Service account Commvault
+#   -> PostgreSQL di test -> Webapp
+#
+# USO:
+#   ansible-playbook -i inventory/test.ini site.yml
+# ============================================================
+
+# --- 1. Prerequisiti sulla VM ---
+- import_playbook: playbooks/01-prerequisiti.yml
+
+# --- 2. RKE2 server ---
+- import_playbook: playbooks/02-rke2-server.yml
+
+# --- 3. Longhorn: storage CSI con snapshot + StorageClass tanzu-sp ---
+- import_playbook: playbooks/10-longhorn.yml
+
+# --- 4. MetalLB ---
+- import_playbook: playbooks/05-metallb.yml
+
+# --- 5. Rancher (+ cert-manager) ---
+- import_playbook: playbooks/06-rancher.yml
+
+# --- 6. Service account Commvault (backup) ---
+- import_playbook: playbooks/07-commvault-sa.yml
+
+# --- 7. PostgreSQL con dati sintetici di test ---
+- import_playbook: playbooks/08-postgres.yml
+
+# --- 8. Webapp Python di verifica dati ---
+- import_playbook: playbooks/09-webapp.yml

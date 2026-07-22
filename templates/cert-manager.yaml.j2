@@ -1,0 +1,19 @@
+# ============================================================
+# cert-manager come HelmChart (lo installa l'helm-controller di RKE2)
+# Nota: la risorsa HelmChart va nel namespace kube-system;
+# il chart vero e proprio viene installato in cert-manager.
+# ============================================================
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: cert-manager
+  namespace: kube-system
+spec:
+  chart: cert-manager
+  repo: {{ cert_manager_repo }}
+  version: {{ cert_manager_version }}
+  targetNamespace: cert-manager
+  createNamespace: true
+  set:
+    # installa anche i CRD di cert-manager (flag moderno, cert-manager >= 1.15)
+    crds.enabled: "true"

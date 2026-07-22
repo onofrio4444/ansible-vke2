@@ -1,0 +1,64 @@
+---
+# ============================================================
+# 02 - RKE2 SERVER (control plane)
+# Installa e avvia RKE2 sul nodo control plane, con CNI canal.
+# ============================================================
+
+- name: Installazione RKE2 server
+  hosts: server
+  gather_facts: true
+  tasks:
+
+    - name: Crea la cartella di configurazione RKE2
+      ansible.builtin.file:
+        path: /etc/rancher/rke2
+        state: directory
+        mode: "0755"
+
+    - name: Scrivi la configurazione del server (token, CNI canal, kubeconfig leggibile)
+      ansible.builtin.copy:
+        dest: /etc/rancher/rke2/config.yaml
+        mode: "0600"
+        content: |
+          token: {{ rke2_token }}
+          cni: {{ rke2_cni }}
+          write-kubeconfig-mode: "0644"
+          tls-san:
+            - {{ ansible_host | default(inventory_hostname) }}
+
+    - name: Installa RKE2 (server) dallo script ufficiale
+      ansible.builtin.shell: curl -sfL https://get.rke2.io | sh -
+      environment:
+        INSTALL_RKE2_TYPE: "server"
+        INSTALL_RKE2_CHANNEL: "{{ rke2_channel }}"
+        INSTALL_RKE2_VERSION: "{{ rke2_version }}"
+      args:
+        creates: "{{ rke2_bin }}"
+
+    - name: Abilita e avvia il servizio rke2-server
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: started
+        enabled: true
+        daemon_reload: true
+
+    - name: Attendi che l'API di Kubernetes risponda (kubeconfig pronto)
+      ansible.builtin.command: "{{ kubectl_bin }} get --raw='/readyz'"
+      environment:
+        KUBECONFIG: "{{ kubeconfig }}"
+      register: api_ready
+      changed_when: false
+      retries: 30
+      delay: 15
+      until: api_ready.rc == 0
+
+    - name: Attendi che il nodo risulti Ready
+      ansible.builtin.command: >
+        {{ kubectl_bin }} wait --for=condition=Ready nodes --all --timeout=60s
+      environment:
+        KUBECONFIG: "{{ kubeconfig }}"
+      changed_when: false
+      retries: 10
+      delay: 15
+      register: nodi_ready
+      until: nodi_ready.rc == 0

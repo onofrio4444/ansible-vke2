@@ -1,0 +1,15 @@
+# StorageClass "tanzu-sp" su Longhorn: stesso nome che i manifest
+# applicativi si aspettano, storage CSI con supporto snapshot.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ storageclass_name }}
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "{{ 'true' if storageclass_default else 'false' }}"
+provisioner: driver.longhorn.io
+parameters:
+  numberOfReplicas: "1"
+  staleReplicaTimeout: "30"
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+allowVolumeExpansion: true

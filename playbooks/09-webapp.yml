@@ -1,0 +1,62 @@
+---
+# ============================================================
+# 09 - WEBAPP PYTHON DI VERIFICA DATI
+# Applicazione Flask in un container che si collega al
+# PostgreSQL del cluster e mostra una pagina HTML con lo stato
+# del collegamento e un estratto dei dati (join ordini-clienti).
+# Esposta con un Service LoadBalancer (IP dal pool MetalLB).
+#
+# USO: ansible-playbook -i inventory/test.ini playbooks/09-webapp.yml
+# ============================================================
+
+- name: Webapp Python di verifica dati
+  hosts: server
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  tasks:
+
+    - name: Copia il manifest della webapp sul nodo
+      ansible.builtin.template:
+        src: ../templates/webapp.yaml.j2
+        dest: /tmp/webapp.yaml
+        mode: "0644"
+
+    - name: Applica la webapp (namespace, secret, configmap, deployment, service)
+      ansible.builtin.command: "{{ kubectl_bin }} apply -f /tmp/webapp.yaml"
+      register: webapp_apply
+      changed_when: "'created' in webapp_apply.stdout or 'configured' in webapp_apply.stdout"
+
+    - name: Attendi che la webapp sia pronta (all'avvio installa le librerie)
+      ansible.builtin.command: >
+        {{ kubectl_bin }} -n webapp rollout status deploy/webapp --timeout=60s
+      register: webapp_ready
+      changed_when: false
+      retries: 10
+      delay: 15
+      until: webapp_ready.rc == 0
+
+    - name: Leggi l'IP assegnato da MetalLB al Service
+      ansible.builtin.command: >
+        {{ kubectl_bin }} -n webapp get svc webapp
+        -o jsonpath={.status.loadBalancer.ingress[0].ip}
+      register: webapp_ip
+      changed_when: false
+      retries: 10
+      delay: 6
+      until: webapp_ip.stdout | length > 0
+
+    - name: Verifica che la pagina risponda e veda i dati
+      ansible.builtin.shell: >
+        curl -s http://{{ webapp_ip.stdout }}/ | grep -o "Collegamento a PostgreSQL riuscito"
+      register: webapp_check
+      changed_when: false
+      retries: 5
+      delay: 5
+      until: webapp_check.rc == 0
+
+    - name: Indirizzo della webapp
+      ansible.builtin.debug:
+        msg: >
+          Webapp attiva: http://{{ webapp_ip.stdout }}/ - la pagina conferma il
+          collegamento a PostgreSQL e mostra i dati di testdb (clienti e ordini).

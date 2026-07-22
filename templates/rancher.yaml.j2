@@ -1,0 +1,25 @@
+# ============================================================
+# Rancher come HelmChart (lo installa l'helm-controller di RKE2)
+# La risorsa HelmChart va nel namespace kube-system;
+# Rancher viene installato nel namespace cattle-system.
+# ============================================================
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: rancher
+  namespace: kube-system
+spec:
+  chart: rancher
+  repo: {{ rancher_chart_repo }}
+{% if rancher_version | default('') | length > 0 %}
+  version: {{ rancher_version }}
+{% endif %}
+  targetNamespace: cattle-system
+  createNamespace: true
+  set:
+    # nome host con cui raggiungerai la UI di Rancher (deve risolvere via DNS o /etc/hosts)
+    hostname: {{ rancher_hostname }}
+    # password iniziale dell'utente admin (cambiala al primo accesso)
+    bootstrapPassword: {{ rancher_bootstrap_password }}
+    # su cluster single-node servono 1 replica (il default del chart e' 3)
+    replicas: "{{ rancher_replicas }}"

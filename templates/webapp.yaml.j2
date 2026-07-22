@@ -1,0 +1,210 @@
+# ============================================================
+# Webapp Python di verifica dati:
+# - namespace "webapp"
+# - ConfigMap con l'applicazione Flask (app.py)
+# - Deployment su python:3.12-slim (installa flask+psycopg all'avvio,
+#   cosi' non serve un registry per un'immagine custom)
+# - Service LoadBalancer (MetalLB assegna un IP dal pool)
+# La pagina mostra lo stato del collegamento a PostgreSQL e un
+# estratto dei dati di testdb (join ordini-clienti).
+# ============================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: webapp
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: webapp-db
+  namespace: webapp
+type: Opaque
+stringData:
+  PGPASSWORD: "{{ postgres_password }}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webapp-code
+  namespace: webapp
+data:
+  app.py: |
+    import os
+    import html
+    import datetime
+
+    import psycopg
+    from flask import Flask
+
+    app = Flask(__name__)
+
+    DSN = (
+        "host=" + os.environ["PGHOST"]
+        + " port=5432 dbname=" + os.environ["PGDATABASE"]
+        + " user=" + os.environ["PGUSER"]
+        + " password=" + os.environ["PGPASSWORD"]
+        + " connect_timeout=5"
+    )
+
+    STILE = (
+        "<style>"
+        "body { font-family:sans-serif; background:#f4f6f8; color:#222;"
+        " padding:2rem; margin:0; } "
+        "h1 { margin:0 0 1rem; } "
+        "h2 { margin:1.5rem 0 .5rem; } "
+        ".ok { background:#e6f7e6; border:1px solid #2e7d32; color:#2e7d32;"
+        " padding:1rem; border-radius:6px; margin-bottom:1rem; } "
+        ".ko { background:#fdecea; border:1px solid #c62828; color:#c62828;"
+        " padding:1rem; border-radius:6px; margin-bottom:1rem; } "
+        "table { border-collapse:collapse; background:#fff; } "
+        "th,td { border:1px solid #ccc; padding:.4rem .8rem; text-align:left; } "
+        "th { background:#eef1f4; } "
+        ".meta { color:#555; margin-bottom:1rem; } "
+        "</style>"
+    )
+
+    def tabella(intestazioni, righe):
+        out = ["<table><tr>"]
+        for i in intestazioni:
+            out.append("<th>" + html.escape(str(i)) + "</th>")
+        out.append("</tr>")
+        for riga in righe:
+            out.append("<tr>")
+            for cella in riga:
+                out.append("<td>" + html.escape(str(cella)) + "</td>")
+            out.append("</tr>")
+        out.append("</table>")
+        return "".join(out)
+
+    @app.route("/healthz")
+    def healthz():
+        return "ok"
+
+    @app.route("/")
+    def index():
+        adesso = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        try:
+            with psycopg.connect(DSN) as conn, conn.cursor() as cur:
+                cur.execute("SELECT version()")
+                versione = cur.fetchone()[0].split(" on ")[0]
+                cur.execute("SELECT count(*) FROM clienti")
+                n_clienti = cur.fetchone()[0]
+                cur.execute("SELECT count(*) FROM ordini")
+                n_ordini = cur.fetchone()[0]
+                cur.execute(
+                    "SELECT o.id, c.nome, c.citta, o.importo, o.stato,"
+                    " to_char(o.data_ordine, 'DD/MM/YYYY')"
+                    " FROM ordini o JOIN clienti c ON c.id = o.cliente_id"
+                    " ORDER BY o.data_ordine DESC LIMIT 10"
+                )
+                ultimi = cur.fetchall()
+                cur.execute(
+                    "SELECT stato, count(*), round(sum(importo), 2)"
+                    " FROM ordini GROUP BY stato ORDER BY count(*) DESC"
+                )
+                stati = cur.fetchall()
+        except Exception as errore:
+            corpo = (
+                "<h1>Verifica collegamento dati</h1>"
+                "<div class='ko'><b>Collegamento a PostgreSQL FALLITO</b><br>"
+                + html.escape(str(errore)) + "</div>"
+                "<p class='meta'>Host: " + html.escape(os.environ["PGHOST"])
+                + " - Ora: " + adesso + "</p>"
+            )
+            return (
+                "<!doctype html><html><head><title>Verifica dati</title>"
+                + STILE + "</head><body>" + corpo + "</body></html>"
+            ), 500
+
+        corpo = (
+            "<h1>Verifica collegamento dati</h1>"
+            "<div class='ok'><b>Collegamento a PostgreSQL riuscito</b></div>"
+            "<p class='meta'>Server: " + html.escape(versione)
+            + " - Host: " + html.escape(os.environ["PGHOST"])
+            + " - Database: " + html.escape(os.environ["PGDATABASE"])
+            + " - Ora: " + adesso + "</p>"
+            "<p>Nel database ci sono <b>" + str(n_clienti) + "</b> clienti e <b>"
+            + str(n_ordini) + "</b> ordini collegati tra loro.</p>"
+            "<h2>Ultimi 10 ordini (join ordini &rarr; clienti)</h2>"
+            + tabella(
+                ["Ordine", "Cliente", "Citta'", "Importo", "Stato", "Data"],
+                ultimi,
+            )
+            + "<h2>Riepilogo ordini per stato</h2>"
+            + tabella(["Stato", "Numero ordini", "Totale EUR"], stati)
+        )
+        return ("<!doctype html><html><head><title>Verifica dati</title>"
+                + STILE + "</head><body>" + corpo + "</body></html>")
+
+    if __name__ == "__main__":
+        app.run(host="0.0.0.0", port=8080)
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  namespace: webapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+    spec:
+      containers:
+        - name: webapp
+          image: python:3.12-slim
+          command: ["/bin/sh", "-c"]
+          args:
+            - pip install --no-cache-dir --quiet flask "psycopg[binary]"
+              && exec python /app/app.py
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PGHOST
+              value: postgres.postgres.svc.cluster.local
+            - name: PGDATABASE
+              value: testdb
+            - name: PGUSER
+              value: postgres
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: webapp-db
+                  key: PGPASSWORD
+          volumeMounts:
+            - name: code
+              mountPath: /app
+          # l'avvio richiede il pip install: la startupProbe da' tempo
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 10
+      volumes:
+        - name: code
+          configMap:
+            name: webapp-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp
+  namespace: webapp
+spec:
+  type: LoadBalancer
+  selector:
+    app: webapp
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

@@ -1,0 +1,45 @@
+-- ============================================================
+-- Dati sintetici di test per PostgreSQL.
+-- Crea il database "testdb" con clienti e ordini generati
+-- casualmente ({{ postgres_seed_clienti }} clienti,
+-- {{ postgres_seed_ordini }} ordini).
+-- ============================================================
+CREATE DATABASE testdb;
+\connect testdb
+
+CREATE TABLE clienti (
+  id        serial PRIMARY KEY,
+  nome      text NOT NULL,
+  email     text UNIQUE NOT NULL,
+  citta     text,
+  creato_il timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE ordini (
+  id          serial PRIMARY KEY,
+  cliente_id  int NOT NULL REFERENCES clienti(id),
+  importo     numeric(10,2) NOT NULL,
+  stato       text NOT NULL,
+  data_ordine timestamptz NOT NULL
+);
+
+INSERT INTO clienti (nome, email, citta)
+SELECT
+  'Cliente ' || g,
+  'cliente' || g || '@example.com',
+  (ARRAY['Roma','Milano','Torino','Napoli','Bologna','Firenze','Palermo','Genova'])[1 + floor(random()*8)::int]
+FROM generate_series(1, {{ postgres_seed_clienti }}) AS g;
+
+INSERT INTO ordini (cliente_id, importo, stato, data_ordine)
+SELECT
+  1 + floor(random()*{{ postgres_seed_clienti }})::int,
+  round((5 + random()*995)::numeric, 2),
+  (ARRAY['nuovo','pagato','spedito','consegnato','annullato'])[1 + floor(random()*5)::int],
+  now() - (random()*365 || ' days')::interval
+FROM generate_series(1, {{ postgres_seed_ordini }}) AS g;
+
+CREATE INDEX ordini_cliente_idx ON ordini (cliente_id);
+CREATE INDEX ordini_data_idx ON ordini (data_ordine);
+
+ANALYZE clienti;
+ANALYZE ordini;

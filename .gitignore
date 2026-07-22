@@ -1,0 +1,14 @@
+# Credenziali e token — NON committare
+commvault-token.txt
+*.token
+*token*.txt
+
+# File locali di Claude Code
+.claude/
+
+# Artefatti Ansible
+*.retry
+
+# Kubeconfig eventualmente copiati in locale
+rke2.yaml
+kubeconfig*

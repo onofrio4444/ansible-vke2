@@ -1,0 +1,34 @@
+# ============================================================
+# Service account per i backup Commvault:
+# - SA "commvault" in kube-system
+# - Secret con token PERMANENTE (da K8s 1.24 non viene piu'
+#   generato da solo: va richiesto con questo tipo di Secret)
+# - ClusterRoleBinding cluster-admin (richiesto da Commvault)
+# ============================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: commvault
+  namespace: kube-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: commvault-token
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: commvault
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: commvault-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: commvault
+    namespace: kube-system

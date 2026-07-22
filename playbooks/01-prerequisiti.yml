@@ -1,0 +1,45 @@
+---
+# ============================================================
+# 01 - PREREQUISITI OS (RHEL)
+# Prepara ogni VM: firewalld off, swap off, NetworkManager per canal.
+# ============================================================
+
+- name: Prerequisiti sistema operativo
+  hosts: all
+  gather_facts: true
+  tasks:
+
+    - name: Disabilita firewalld (RKE2 gestisce la rete dei pod da solo)
+      ansible.builtin.systemd:
+        name: firewalld
+        state: stopped
+        enabled: false
+      failed_when: false        # se firewalld non e' installato, prosegui
+
+    - name: Disattiva lo swap adesso
+      ansible.builtin.command: swapoff -a
+      changed_when: false
+
+    - name: Disattiva lo swap anche ai riavvii (commenta le righe swap in fstab)
+      ansible.builtin.replace:
+        path: /etc/fstab
+        regexp: '^([^#].*\sswap\s.*)$'
+        replace: '# \1'
+
+    - name: Fai in modo che NetworkManager non gestisca le interfacce del CNI canal
+      ansible.builtin.copy:
+        dest: /etc/NetworkManager/conf.d/rke2-canal.conf
+        content: |
+          [keyfile]
+          unmanaged-devices=interface-name:cali*;interface-name:flannel*
+        owner: root
+        group: root
+        mode: "0644"
+      register: nm_conf
+
+    - name: Ricarica NetworkManager se ho cambiato la configurazione
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: reloaded
+      when: nm_conf.changed
+      failed_when: false

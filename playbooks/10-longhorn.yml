@@ -1,0 +1,88 @@
+---
+# ============================================================
+# 10 - LONGHORN (storage CSI con snapshot)
+# Storage CSI necessario a Commvault per i backup dei volumi.
+# - prerequisito iSCSI sul nodo (RHEL)
+# - Longhorn via HelmChart, 1 replica (single-node)
+# - VolumeSnapshotClass "longhorn-snapclass" per Commvault
+# - StorageClass "tanzu-sp" (stesso storage Longhorn, nome che
+#   i manifest applicativi si aspettano)
+#
+# USO: ansible-playbook -i inventory/test.ini playbooks/10-longhorn.yml
+# ============================================================
+
+- name: Prerequisiti Longhorn (iSCSI)
+  hosts: all
+  gather_facts: false
+  tasks:
+
+    - name: Installa iscsi-initiator-utils
+      ansible.builtin.package:
+        name: iscsi-initiator-utils
+        state: present
+
+    - name: Abilita e avvia iscsid
+      ansible.builtin.systemd:
+        name: iscsid
+        state: started
+        enabled: true
+
+- name: Installazione Longhorn
+  hosts: server
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  tasks:
+
+    - name: Copia il template HelmChart di Longhorn sul nodo
+      ansible.builtin.template:
+        src: ../templates/longhorn.yaml.j2
+        dest: /tmp/longhorn.yaml
+        mode: "0644"
+
+    - name: Applica Longhorn (HelmChart) e la VolumeSnapshotClass
+      ansible.builtin.command: "{{ kubectl_bin }} apply -f /tmp/longhorn.yaml"
+      register: lh_apply
+      changed_when: "'created' in lh_apply.stdout or 'configured' in lh_apply.stdout"
+
+    - name: Attendi che il driver CSI di Longhorn sia registrato
+      ansible.builtin.command: "{{ kubectl_bin }} get csidriver driver.longhorn.io"
+      register: lh_csi
+      changed_when: false
+      retries: 40
+      delay: 15
+      until: lh_csi.rc == 0
+
+    - name: Attendi che il plugin CSI sia attivo su tutti i nodi
+      ansible.builtin.command: >
+        {{ kubectl_bin }} -n longhorn-system rollout status daemonset/longhorn-csi-plugin --timeout=60s
+      register: lh_plugin
+      changed_when: false
+      retries: 10
+      delay: 15
+      until: lh_plugin.rc == 0
+
+    - name: Copia il template della StorageClass tanzu-sp sul nodo
+      ansible.builtin.template:
+        src: ../templates/tanzu-sp-storageclass.yaml.j2
+        dest: /tmp/tanzu-sp-storageclass.yaml
+        mode: "0644"
+
+    - name: Crea la StorageClass tanzu-sp (su Longhorn)
+      ansible.builtin.command: "{{ kubectl_bin }} apply -f /tmp/tanzu-sp-storageclass.yaml"
+      register: sc_apply
+      changed_when: "'created' in sc_apply.stdout or 'configured' in sc_apply.stdout"
+
+    - name: Riepilogo StorageClass e VolumeSnapshotClass
+      ansible.builtin.command: >
+        {{ kubectl_bin }} get storageclass,volumesnapshotclass
+      register: lh_classes
+      changed_when: false
+
+    - name: Mostra il riepilogo
+      ansible.builtin.debug:
+        msg: |
+          Longhorn installato. Per Commvault:
+          - StorageClass con snapshot CSI: "longhorn"
+          - VolumeSnapshotClass: "longhorn-snapclass"
+          {{ lh_classes.stdout }}

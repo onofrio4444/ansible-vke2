@@ -1,0 +1,56 @@
+---
+# ============================================================
+# 07 - SERVICE ACCOUNT COMMVAULT (backup)
+# Crea il SA "commvault" con token permanente e permessi
+# cluster-admin, come richiesto da Commvault.
+# Alla fine STAMPA IL TOKEN da inserire in Commvault.
+#
+# USO: ansible-playbook -i inventory/test.ini playbooks/07-commvault-sa.yml
+# ============================================================
+
+- name: Service account Commvault
+  hosts: server
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  tasks:
+
+    - name: Copia il manifest del service account sul nodo
+      ansible.builtin.template:
+        src: ../templates/commvault-sa.yaml.j2
+        dest: /tmp/commvault-sa.yaml
+        mode: "0644"
+
+    - name: Applica service account, token e ClusterRoleBinding
+      ansible.builtin.command: "{{ kubectl_bin }} apply -f /tmp/commvault-sa.yaml"
+      register: sa_apply
+      changed_when: "'created' in sa_apply.stdout or 'configured' in sa_apply.stdout"
+
+    - name: Attendi che il token venga generato nel Secret
+      ansible.builtin.command: >
+        {{ kubectl_bin }} -n kube-system get secret commvault-token -o jsonpath={.data.token}
+      register: sa_token
+      changed_when: false
+      retries: 10
+      delay: 3
+      until: sa_token.stdout | length > 0
+
+    # Il token e' lungo ~900 caratteri: stamparlo a video lo spezza su piu'
+    # righe (callback yaml) e copiandolo si corrompe. Meglio salvarlo in un file.
+    - name: Salva il token in un file sulla macchina di controllo
+      ansible.builtin.copy:
+        content: "{{ sa_token.stdout | b64decode }}"
+        dest: "{{ playbook_dir }}/../commvault-token.txt"
+        mode: "0600"
+      delegate_to: localhost
+      # niente sudo in locale: ansible_become dell'inventario va azzerato qui
+      become: false
+      vars:
+        ansible_become: false
+
+    - name: Istruzioni per Commvault
+      ansible.builtin.debug:
+        msg: >
+          Endpoint API del cluster: https://{{ ansible_host | default(inventory_hostname) }}:6443 .
+          Token salvato in commvault-token.txt (nella cartella del progetto):
+          incollane il contenuto in Commvault, poi elimina il file.
