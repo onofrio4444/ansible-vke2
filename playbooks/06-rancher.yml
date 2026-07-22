@@ -1,48 +1,20 @@
 ---
 # ============================================================
-# 06 - RANCHER (+ cert-manager)
-# Installa cert-manager e poi Rancher usando l'helm-controller
-# gia' presente in RKE2 (risorse HelmChart applicate con kubectl).
-# Ordine: cert-manager -> attesa -> Rancher -> attesa.
+# 06 - RANCHER
+# Installa Rancher usando l'helm-controller gia' presente in
+# RKE2 (risorsa HelmChart applicata con kubectl).
+# Prerequisito: cert-manager (playbook 12, importato prima
+# in site.yml).
 # Gira sul SERVER (usa il kubectl e la kubeconfig del control plane).
 # Si puo' saltare mettendo rancher_enabled: false.
 # ============================================================
 
-- name: Installazione Rancher e cert-manager
+- name: Installazione Rancher
   hosts: server
   gather_facts: false
   environment:
     KUBECONFIG: "{{ kubeconfig }}"
   tasks:
-
-    # --- cert-manager ---------------------------------------
-
-    - name: Copia il template HelmChart di cert-manager sul nodo
-      ansible.builtin.template:
-        src: ../templates/cert-manager.yaml.j2
-        dest: /tmp/cert-manager.yaml
-        mode: "0644"
-      when: rancher_enabled | default(true)
-
-    - name: Applica cert-manager (HelmChart)
-      ansible.builtin.command: "{{ kubectl_bin }} apply -f /tmp/cert-manager.yaml"
-      register: cm_apply
-      changed_when: "'created' in cm_apply.stdout or 'configured' in cm_apply.stdout"
-      when: rancher_enabled | default(true)
-
-    - name: Attendi che cert-manager sia installato e pronto
-      # Il webhook di cert-manager esiste solo dopo che l'helm-controller
-      # ha finito: il ciclo retry tollera i primi tentativi "not found".
-      ansible.builtin.command: >
-        {{ kubectl_bin }} -n cert-manager rollout status deploy/cert-manager-webhook --timeout=30s
-      register: cm_ready
-      changed_when: false
-      retries: 20
-      delay: 15
-      until: cm_ready.rc == 0
-      when: rancher_enabled | default(true)
-
-    # --- Rancher --------------------------------------------
 
     - name: Copia il template HelmChart di Rancher sul nodo
       ansible.builtin.template:

@@ -1,0 +1,39 @@
+---
+# ============================================================
+# 12 - CERT-MANAGER (HelmChart)
+# Installato come componente autonomo (prima era dentro il
+# playbook di Rancher): cosi' e' un'applicazione a se' stante,
+# presente anche con rancher_enabled: false e backuppabile
+# da Commvault (namespace "cert-manager", release Helm inclusa).
+#
+# USO: ansible-playbook -i inventory/test.ini playbooks/12-cert-manager.yml
+# ============================================================
+
+- name: Installazione cert-manager
+  hosts: server
+  gather_facts: false
+  environment:
+    KUBECONFIG: "{{ kubeconfig }}"
+  tasks:
+
+    - name: Copia il template HelmChart di cert-manager sul nodo
+      ansible.builtin.template:
+        src: ../templates/cert-manager.yaml.j2
+        dest: /tmp/cert-manager.yaml
+        mode: "0644"
+
+    - name: Applica cert-manager (HelmChart)
+      ansible.builtin.command: "{{ kubectl_bin }} apply -f /tmp/cert-manager.yaml"
+      register: cm_apply
+      changed_when: "'created' in cm_apply.stdout or 'configured' in cm_apply.stdout"
+
+    - name: Attendi che cert-manager sia installato e pronto
+      # Il webhook di cert-manager esiste solo dopo che l'helm-controller
+      # ha finito: il ciclo retry tollera i primi tentativi "not found".
+      ansible.builtin.command: >
+        {{ kubectl_bin }} -n cert-manager rollout status deploy/cert-manager-webhook --timeout=30s
+      register: cm_ready
+      changed_when: false
+      retries: 20
+      delay: 15
+      until: cm_ready.rc == 0

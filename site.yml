@@ -22,17 +22,17 @@
 # --- 4. MetalLB ---
 - import_playbook: playbooks/05-metallb.yml
 
-# --- 5. Rancher (+ cert-manager) ---
+# --- 5. cert-manager (prerequisito di Rancher, applicazione autonoma) ---
+- import_playbook: playbooks/12-cert-manager.yml
+
+# --- 6. Rancher ---
 - import_playbook: playbooks/06-rancher.yml
 
-# --- 6. Service account Commvault (backup) ---
+# --- 7. Service account Commvault (backup) ---
 - import_playbook: playbooks/07-commvault-sa.yml
 
-# --- 7. PostgreSQL con dati sintetici di test ---
+# --- 8. PostgreSQL con dati sintetici di test ---
 - import_playbook: playbooks/08-postgres.yml
-
-# --- 8. Risorse di test per il backup (Secret, Deployment, HelmChart) ---
-- import_playbook: playbooks/11-risorse-test.yml
 
 # --- 9. Webapp Python di verifica dati ---
 - import_playbook: playbooks/09-webapp.yml

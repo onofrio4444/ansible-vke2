@@ -27,7 +27,7 @@ storageclass_default: true
 # ---------- MetalLB ----------
 metallb_version: "v0.15.2"
 # Range di IP LIBERI per i Service LoadBalancer.
-metallb_ip_range: "192.168.114.200-192.168.114.204"
+metallb_ip_range: "192.168.114.199-192.168.114.204"
 
 # ---------- Rancher (+ cert-manager) ----------
 # Abilita/disabilita l'installazione di Rancher.
@@ -62,11 +62,3 @@ postgres_storage: "5Gi"
 # Quanti dati sintetici generare nel database testdb.
 postgres_seed_clienti: 10000
 postgres_seed_ordini: 50000
-
-# ---------- Risorse di test per il backup (namespace postgres) ----------
-# App di esempio installata via Helm (podinfo). Un secondo cert-manager
-# non si puo' usare come test: esiste gia' a livello di cluster.
-test_helm_repo: "https://stefanprodan.github.io/podinfo"
-test_helm_chart: "podinfo"
-# Versione del chart da fissare (vuoto = ultima della repo).
-test_helm_version: ""
