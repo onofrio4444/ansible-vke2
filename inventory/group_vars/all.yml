@@ -5,15 +5,20 @@
 # ============================================================
 
 # ---------- RKE2 ----------
-# Versione da installare. Lascia "" per l'ultima stabile del canale.
-rke2_version: ""
+# Versione da installare. Fissata: con "" lo script deve risolvere la
+# versione dal canale online e a volte fallisce (URL repo con serie
+# "stable/stable" -> 404). Aggiornala qui quando vuoi salire di versione.
+rke2_version: "v1.35.6+rke2r1"
 rke2_channel: "stable"
 # CNI richiesto.
 rke2_cni: "canal"
 # Token del cluster: CAMBIALO con una stringa segreta a piacere.
 rke2_token: "una-stringa-segreta-a-piacere"
 # Percorsi standard installati da RKE2 (di norma non serve toccarli).
-rke2_bin: "/usr/local/bin/rke2"
+# Su RHEL lo script installa via RPM: il binario finisce in /usr/bin/rke2
+# (non /usr/local/bin come col metodo tarball). Serve al "creates:" del
+# task di installazione per non rilanciare lo script a ogni run.
+rke2_bin: "/usr/bin/rke2"
 kubectl_bin: "/var/lib/rancher/rke2/bin/kubectl"
 kubeconfig: "/etc/rancher/rke2/rke2.yaml"
 
@@ -35,7 +40,7 @@ rancher_enabled: true
 # Nome host della UI di Rancher: DEVE essere un nome DNS (non un IP), perche'
 # l'Ingress di Kubernetes non accetta IP come host.
 # rancher.<IP>.sslip.io risolve da solo verso l'IP, senza toccare DNS o /etc/hosts.
-rancher_hostname: "rancher.192.168.114.124.sslip.io"
+rancher_hostname: "rancher.192.168.114.127.sslip.io"
 # Password iniziale admin (min. 12 caratteri). Cambiala al primo login.
 rancher_bootstrap_password: "CambiaMiSubito123"
 # Repo chart Rancher: stable | latest | alpha

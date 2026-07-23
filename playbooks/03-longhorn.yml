@@ -40,6 +40,19 @@
         dest: /tmp/longhorn.yaml
         mode: "0644"
 
+    - name: Attendi le CRD snapshot di RKE2
+      # L'helm-controller di RKE2 installa le CRD snapshot (chart
+      # rke2-snapshot-controller-crd) poco DOPO l'avvio dell'API: su un
+      # cluster appena creato bisogna aspettarle, altrimenti l'apply
+      # della VolumeSnapshotClass fallisce con "no matches for kind".
+      ansible.builtin.command: >
+        {{ kubectl_bin }} get crd volumesnapshotclasses.snapshot.storage.k8s.io
+      register: snap_crd
+      changed_when: false
+      retries: 30
+      delay: 10
+      until: snap_crd.rc == 0
+
     - name: Applica Longhorn (HelmChart) e la VolumeSnapshotClass
       ansible.builtin.command: "{{ kubectl_bin }} apply -f /tmp/longhorn.yaml"
       register: lh_apply
