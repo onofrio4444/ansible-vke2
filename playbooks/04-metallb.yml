@@ -1,6 +1,6 @@
 ---
 # ============================================================
-# 05 - METALLB (LoadBalancer su IP aggiuntivi)
+# 04 - METALLB (LoadBalancer su IP aggiuntivi)
 # Installa MetalLB e configura il pool di IP + annuncio L2.
 # Gira sul SERVER (usa il kubectl e la kubeconfig del control plane).
 # ============================================================

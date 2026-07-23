@@ -1,12 +1,12 @@
 ---
 # ============================================================
-# 12 - CERT-MANAGER (HelmChart)
+# 05 - CERT-MANAGER (HelmChart)
 # Installato come componente autonomo (prima era dentro il
 # playbook di Rancher): cosi' e' un'applicazione a se' stante,
 # presente anche con rancher_enabled: false e backuppabile
 # da Commvault (namespace "cert-manager", release Helm inclusa).
 #
-# USO: ansible-playbook -i inventory/test.ini playbooks/12-cert-manager.yml
+# USO: ansible-playbook -i inventory/test.ini playbooks/05-cert-manager.yml
 # ============================================================
 
 - name: Installazione cert-manager

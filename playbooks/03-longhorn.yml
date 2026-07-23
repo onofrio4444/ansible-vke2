@@ -1,6 +1,6 @@
 ---
 # ============================================================
-# 10 - LONGHORN (storage CSI con snapshot)
+# 03 - LONGHORN (storage CSI con snapshot)
 # Storage CSI necessario a Commvault per i backup dei volumi.
 # - prerequisito iSCSI sul nodo (RHEL)
 # - Longhorn via HelmChart, 1 replica (single-node)
@@ -8,7 +8,7 @@
 # - StorageClass "tanzu-sp" (stesso storage Longhorn, nome che
 #   i manifest applicativi si aspettano)
 #
-# USO: ansible-playbook -i inventory/test.ini playbooks/10-longhorn.yml
+# USO: ansible-playbook -i inventory/test.ini playbooks/03-longhorn.yml
 # ============================================================
 
 - name: Prerequisiti Longhorn (iSCSI)

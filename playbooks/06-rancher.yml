@@ -3,7 +3,7 @@
 # 06 - RANCHER
 # Installa Rancher usando l'helm-controller gia' presente in
 # RKE2 (risorsa HelmChart applicata con kubectl).
-# Prerequisito: cert-manager (playbook 12, importato prima
+# Prerequisito: cert-manager (playbook 05, importato prima
 # in site.yml).
 # Gira sul SERVER (usa il kubectl e la kubeconfig del control plane).
 # Si puo' saltare mettendo rancher_enabled: false.
