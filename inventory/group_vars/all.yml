@@ -35,7 +35,7 @@ rancher_enabled: true
 # Nome host della UI di Rancher: DEVE essere un nome DNS (non un IP), perche'
 # l'Ingress di Kubernetes non accetta IP come host.
 # rancher.<IP>.sslip.io risolve da solo verso l'IP, senza toccare DNS o /etc/hosts.
-rancher_hostname: "rancher.192.168.114.117.sslip.io"
+rancher_hostname: "rancher.192.168.114.124.sslip.io"
 # Password iniziale admin (min. 12 caratteri). Cambiala al primo login.
 rancher_bootstrap_password: "CambiaMiSubito123"
 # Repo chart Rancher: stable | latest | alpha
