@@ -37,9 +37,16 @@
 
     # Il token e' lungo ~900 caratteri: stamparlo a video lo spezza su piu'
     # righe (callback yaml) e copiandolo si corrompe. Meglio salvarlo in un file.
-    - name: Salva il token in un file sulla macchina di controllo
+    - name: Salva token e dati di collegamento in un file sulla macchina di controllo
       ansible.builtin.copy:
-        content: "{{ sa_token.stdout | b64decode }}"
+        content: |
+          Dati per configurare il cluster in Commvault
+          ============================================
+          Endpoint API     : https://{{ ansible_host | default(inventory_hostname) }}:6443
+          Service account  : commvault
+          Namespace        : kube-system
+          Token (incolla in Commvault SOLO la riga sotto, senza spazi o a capo):
+          {{ sa_token.stdout | b64decode }}
         dest: "{{ playbook_dir }}/../commvault-token.txt"
         mode: "0600"
       delegate_to: localhost
