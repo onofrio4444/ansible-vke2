@@ -23,6 +23,10 @@ spec:
   valuesContent: |-
     defaultSettings:
       defaultReplicaCount: 1
+{% if data_disk_path | default('') | length > 0 %}
+      # I volumi vivono sul disco dati dedicato, non sul disco di sistema.
+      defaultDataPath: {{ data_disk_path }}/longhorn
+{% endif %}
     persistence:
       defaultClass: false
       defaultClassReplicaCount: 1

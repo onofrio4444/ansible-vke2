@@ -22,6 +22,14 @@ rke2_bin: "/usr/bin/rke2"
 kubectl_bin: "/var/lib/rancher/rke2/bin/kubectl"
 kubeconfig: "/etc/rancher/rke2/rke2.yaml"
 
+# ---------- Disco dati dedicato ----------
+# Punto di mount del disco a parte (es. /dev/sdb montato su /data).
+# Tutto cio' che occupa spazio finisce li': immagini container, etcd
+# e chart (/var/lib/rancher in bind), dischi effimeri dei pod
+# (/var/lib/kubelet in bind) e volumi Longhorn (<path>/longhorn).
+# Lascia "" per usare il disco di sistema come prima.
+data_disk_path: "/data"
+
 # ---------- StorageClass "tanzu-sp" (su Longhorn) ----------
 # Chiamata "tanzu-sp" cosi' i manifest applicativi che cercano
 # quel nome funzionano; dietro c'e' Longhorn (CSI con snapshot).
