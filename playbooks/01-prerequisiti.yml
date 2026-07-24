@@ -54,6 +54,44 @@
       when: data_disk_path | default('') | length > 0
       block:
 
+        - name: Controlla se il disco dati e' gia' montato
+          ansible.builtin.command: mountpoint -q {{ data_disk_path }}
+          register: data_mounted
+          changed_when: false
+          failed_when: false
+
+        - name: Prepara il disco dati se il mount non esiste ancora
+          when: data_mounted.rc != 0 and (data_disk_device | default('') | length > 0)
+          block:
+
+            - name: Controlla che il disco sia vuoto (niente partizioni o filesystem)
+              ansible.builtin.command: wipefs -n {{ data_disk_device }}
+              register: disk_sig
+              changed_when: false
+
+            - name: Blocca se il disco contiene gia' dati
+              ansible.builtin.fail:
+                msg: >-
+                  {{ data_disk_device }} contiene gia' partizioni o un
+                  filesystem: non lo formatto. Pulisci il disco a mano
+                  (wipefs -a) o monta tu {{ data_disk_path }} e rilancia.
+              when: disk_sig.stdout | length > 0
+
+            - name: Crea il filesystem XFS sul disco dati
+              ansible.builtin.command: mkfs.xfs {{ data_disk_device }}
+
+            - name: Leggi l'UUID del filesystem appena creato
+              ansible.builtin.command: blkid -s UUID -o value {{ data_disk_device }}
+              register: data_uuid
+              changed_when: false
+
+            - name: Monta il disco dati (persistente in fstab, via UUID)
+              ansible.posix.mount:
+                path: "{{ data_disk_path }}"
+                src: "UUID={{ data_uuid.stdout }}"
+                fstype: xfs
+                state: mounted
+
         - name: Verifica che il disco dati sia montato
           ansible.builtin.command: mountpoint -q {{ data_disk_path }}
           changed_when: false
