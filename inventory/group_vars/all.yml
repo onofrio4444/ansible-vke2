@@ -22,6 +22,15 @@ rke2_bin: "/usr/bin/rke2"
 kubectl_bin: "/var/lib/rancher/rke2/bin/kubectl"
 kubeconfig: "/etc/rancher/rke2/rke2.yaml"
 
+# ---------- CA aziendale e registry privati ----------
+# CA self-signed da far fidare al sistema operativo e a containerd,
+# cosi' i pod possono scaricare immagini dal GitLab interno.
+# Il file sta in files/ nel repo. Lascia "" per non installare nulla.
+custom_ca_file: "ior-selfsigned-ca.crt"
+# Registry privati (host:porta) che usano quella CA.
+private_registries:
+  - "gitlab-pro.ior.local:5050"
+
 # ---------- Disco dati dedicato ----------
 # Punto di mount del disco a parte (es. /dev/sdb montato su /data).
 # Tutto cio' che occupa spazio finisce li': immagini container, etcd
@@ -29,6 +38,10 @@ kubeconfig: "/etc/rancher/rke2/rke2.yaml"
 # (/var/lib/kubelet in bind) e volumi Longhorn (<path>/longhorn).
 # Lascia "" per usare il disco di sistema come prima.
 data_disk_path: "/data"
+# Disco da preparare (XFS + mount su data_disk_path) se il mount non
+# esiste ancora. Agisce SOLO su disco vuoto: se trova partizioni o
+# filesystem si ferma. Lascia "" se /data e' gia' montato da te.
+data_disk_device: "/dev/sdb"
 
 # ---------- StorageClass "tanzu-sp" (su Longhorn) ----------
 # Chiamata "tanzu-sp" cosi' i manifest applicativi che cercano

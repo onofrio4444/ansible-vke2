@@ -26,6 +26,42 @@
           tls-san:
             - {{ ansible_host | default(inventory_hostname) }}
 
+    # ---------- CA aziendale per i registry privati ----------
+    # Serve PRIMA dell'avvio di RKE2: containerd legge registries.yaml
+    # alla partenza. La CA va sia nel trust dell'OS (curl, ecc.) sia
+    # in registries.yaml (i pull delle immagini dei pod).
+    - name: Installa la CA aziendale nel trust del sistema operativo
+      ansible.builtin.copy:
+        src: "../files/{{ custom_ca_file }}"
+        dest: "/etc/pki/ca-trust/source/anchors/{{ custom_ca_file }}"
+        owner: root
+        group: root
+        mode: "0644"
+      register: ca_anchor
+      when: custom_ca_file | default('') | length > 0
+
+    - name: Aggiorna il trust store del sistema operativo
+      ansible.builtin.command: update-ca-trust extract
+      when: ca_anchor.changed
+
+    - name: Configura containerd per fidarsi della CA sui registry privati
+      ansible.builtin.copy:
+        dest: /etc/rancher/rke2/registries.yaml
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          configs:
+          {% for reg in private_registries | default([]) %}
+            "{{ reg }}":
+              tls:
+                ca_file: /etc/pki/ca-trust/source/anchors/{{ custom_ca_file }}
+          {% endfor %}
+      register: registries_conf
+      when:
+        - custom_ca_file | default('') | length > 0
+        - private_registries | default([]) | length > 0
+
     - name: Installa RKE2 (server) dallo script ufficiale
       ansible.builtin.shell: curl -sfL https://get.rke2.io | sh -
       environment:
@@ -41,6 +77,17 @@
         state: started
         enabled: true
         daemon_reload: true
+      register: rke2_start
+
+    - name: Riavvia rke2-server se CA o registry sono cambiati a cluster gia' avviato
+      # Al primo avvio non serve (la configurazione era gia' in posto);
+      # serve solo quando si aggiunge/cambia la CA su un cluster esistente.
+      ansible.builtin.systemd:
+        name: rke2-server
+        state: restarted
+      when:
+        - not rke2_start.changed
+        - (ca_anchor is defined and ca_anchor.changed) or (registries_conf is defined and registries_conf.changed)
 
     - name: Attendi che l'API di Kubernetes risponda (kubeconfig pronto)
       ansible.builtin.command: "{{ kubectl_bin }} get --raw='/readyz'"
