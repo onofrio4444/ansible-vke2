@@ -43,3 +43,66 @@
         state: reloaded
       when: nm_conf.changed
       failed_when: false
+
+    # ---------- Disco dati dedicato ----------
+    # RKE2 e kubelet scrivono sempre in /var/lib/rancher e
+    # /var/lib/kubelet: cambiare i loro percorsi e' fragile (SELinux),
+    # quindi montiamo quelle cartelle in bind dal disco dati. I volumi
+    # Longhorn invece usano direttamente {{ data_disk_path }}/longhorn
+    # (impostato nel template del chart).
+    - name: Prepara il disco dati dedicato
+      when: data_disk_path | default('') | length > 0
+      block:
+
+        - name: Verifica che il disco dati sia montato
+          ansible.builtin.command: mountpoint -q {{ data_disk_path }}
+          changed_when: false
+
+        - name: Controlla se /var/lib/rancher e' gia' un bind mount
+          ansible.builtin.command: mountpoint -q /var/lib/rancher
+          register: rancher_mounted
+          changed_when: false
+          failed_when: false
+
+        - name: Controlla se RKE2 ha gia' dati sul disco di sistema
+          ansible.builtin.stat:
+            path: /var/lib/rancher/rke2/server
+          register: rancher_on_root
+
+        - name: Blocca se RKE2 e' gia' installato sul disco di sistema
+          ansible.builtin.fail:
+            msg: >-
+              /var/lib/rancher contiene gia' un cluster RKE2 sul disco di
+              sistema: montare il bind ora lo nasconderebbe. Disinstalla RKE2
+              (rke2-uninstall.sh) o svuota la cartella, poi rilancia.
+          when: rancher_mounted.rc != 0 and rancher_on_root.stat.exists
+
+        - name: Crea le cartelle sul disco dati e i punti di mount
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: directory
+            owner: root
+            group: root
+            mode: "0755"
+          loop:
+            - "{{ data_disk_path }}/rancher"
+            - "{{ data_disk_path }}/kubelet"
+            - "{{ data_disk_path }}/longhorn"
+            - /var/lib/rancher
+            - /var/lib/kubelet
+
+        - name: Monta in bind /var/lib/rancher e /var/lib/kubelet dal disco dati
+          ansible.posix.mount:
+            path: "{{ item.dest }}"
+            src: "{{ item.src }}"
+            fstype: none
+            opts: bind
+            state: mounted
+          loop:
+            - { src: "{{ data_disk_path }}/rancher", dest: /var/lib/rancher }
+            - { src: "{{ data_disk_path }}/kubelet", dest: /var/lib/kubelet }
+
+        - name: Sistema le etichette SELinux sui punti di mount
+          ansible.builtin.command: restorecon -R /var/lib/rancher /var/lib/kubelet
+          changed_when: false
+          failed_when: false
